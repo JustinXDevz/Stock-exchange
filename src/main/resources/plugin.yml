@@ -1,0 +1,34 @@
+name: StockExchange
+version: '${project.version}'
+main: dev.bursa.stockexchange.StockExchangePlugin
+api-version: '26.2'
+description: Bursa saham dengan perusahaan buatan pemain, IPO, dividen, dan harga dinamis.
+depend: [Vault]
+softdepend: [EconomyShopGUI, EconomyShopGUI-Premium]
+
+commands:
+  stock:
+    description: Buka bursa saham / perintah trading
+    aliases: [bursa, saham]
+    usage: /stock [buy|sell|price|portfolio|top|news|history]
+    permission: stockexchange.use
+  company:
+    description: Kelola perusahaanmu
+    aliases: [perusahaan]
+    usage: /company <create|ipo|info|deposit|dividend|delist|icon|desc|list>
+    permission: stockexchange.company
+  stockadmin:
+    description: Perintah admin bursa
+    usage: /stockadmin <create|delete|setprice|setvol|seticon|event|freeze|unfreeze|reload|list>
+    permission: stockexchange.admin
+
+permissions:
+  stockexchange.use:
+    description: Memakai bursa saham
+    default: true
+  stockexchange.company:
+    description: Membuat dan mengelola perusahaan
+    default: true
+  stockexchange.admin:
+    description: Perintah admin bursa
+    default: op
