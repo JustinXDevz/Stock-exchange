@@ -1,0 +1,101 @@
+# ===== StockExchange config =====
+currency-symbol: "$"
+database-file: "stockexchange.db"
+
+market:
+  # Interval update harga (detik). Perlu restart server jika diubah.
+  update-interval-seconds: 60
+  # Setiap N update, 1 titik grafik disimpan.
+  history-interval-ticks: 5
+  # Fee tiap transaksi beli/jual (money sink), dalam persen.
+  fee-percent: 2.0
+  # Dampak harga per transaksi: harga bergerak sebesar impact * jumlah / totalSaham.
+  price-impact: 0.5
+  # Maksimal ukuran 1 transaksi, persen dari total saham perusahaan.
+  max-trade-percent: 10.0
+  min-price: 0.01
+  default-volatility: 0.01
+  # Saham sistem (buatan admin) ditarik pelan ke harga dasarnya.
+  base-pull: 0.01
+  # Saham perusahaan pemain ditarik pelan ke (kas * multiplier / totalSaham).
+  book-value-multiplier: 3.0
+  book-pull: 0.01
+  # Delisting otomatis: harga di bawah delist-price selama delist-ticks update berturut-turut.
+  delist-price: 0.25
+  delist-ticks: 60
+
+events:
+  enabled: true
+  interval-minutes: 30
+  chance: 0.6
+  drift: 0.03
+  duration-ticks: 10
+  boom-messages:
+    - "<green>Kabar baik! Saham <white>{name}</white> ({ticker}) melonjak setelah laporan positif."
+    - "<green>Investor memburu saham <white>{name}</white> ({ticker})!"
+  crash-messages:
+    - "<red>Kepanikan pasar! Saham <white>{name}</white> ({ticker}) anjlok."
+    - "<red>Rumor buruk menghantam saham <white>{name}</white> ({ticker})."
+
+company:
+  creation-fee: 5000
+  max-per-player: 2
+  min-total-shares: 100
+  max-total-shares: 100000
+  # Pendiri wajib menahan minimal persen ini setelah IPO.
+  min-founder-percent: 51
+  # Pendiri tidak boleh menjual sahamnya selama N jam setelah listing.
+  lockup-hours: 72
+  ipo:
+    listing-fee: 1000
+    min-price: 1.0
+    max-price: 1000.0
+    max-duration-hours: 72
+    # IPO gagal (dana dikembalikan) bila terjual kurang dari persen ini.
+    min-sold-percent: 50
+    # Batas pembelian per pemain, persen dari saham yang ditawarkan (anti borong akun alt).
+    max-per-player-percent: 40
+  dividend:
+    max-percent-of-treasury: 20
+    cooldown-hours: 24
+
+admin:
+  default-total-shares: 10000
+
+# ===== Integrasi EconomyShopGUI =====
+# Butuh plugin EconomyShopGUI (gratis/premium) terpasang. Harga item di shop dibuat dinamis
+# lewat fitur bawaan EconomyShopGUI (Dynamic Pricing), plugin ini menyambungkan transaksinya ke bursa.
+shop:
+  enabled: true
+  # Nilai transaksi (uang) yang setara tekanan harga 1.0 pada saham sektor.
+  volume-reference: 10000.0
+  # Perubahan harga per 1.0 tekanan, dan batas perubahan per update harga.
+  sensitivity: 0.02
+  max-change-per-tick: 0.05
+  # Batas kontribusi 1 pemain per update harga (anti manipulasi harga saham).
+  max-per-player-per-tick: 5000.0
+  # Arah tekanan: beli dari shop = permintaan naik (+), jual ke shop = pasokan naik (-).
+  buy-direction: 1.0
+  sell-direction: -1.0
+  revenue:
+    # Persen dari nilai tiap transaksi shop di sektor itu yang masuk ke kas perusahaan pemain
+    # yang memilih sektor tsb (/company sector). Ini uang BARU dari server, jaga angkanya kecil.
+    share-percent: 1.0
+    # Batas pemasukan per perusahaan per 24 jam.
+    daily-cap-per-company: 5000.0
+  # Sektor dicocokkan ke "token" item (nama material / nama section shop, dipecah per _ atau .),
+  # misal DIAMOND_ORE -> DIAMOND, ORE. Pakai /stockadmin shopdebug untuk melihat token asli.
+  # stock: ticker saham (boleh kosong) yang ikut naik/turun mengikuti volume sektor.
+  sectors:
+    mining:
+      name: "Pertambangan"
+      stock: ""
+      match: [ORE, ORES, INGOT, RAW, DIAMOND, EMERALD, NETHERITE, COAL, REDSTONE, LAPIS, QUARTZ, GOLD, IRON, COPPER]
+    farming:
+      name: "Pertanian"
+      stock: ""
+      match: [WHEAT, CARROT, POTATO, BEETROOT, MELON, PUMPKIN, SUGAR, COCOA, BREAD, SEEDS, FARMING, CROPS]
+    building:
+      name: "Konstruksi"
+      stock: ""
+      match: [STONE, COBBLESTONE, BRICKS, PLANKS, LOG, GLASS, CONCRETE, BLOCKS]
