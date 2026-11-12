@@ -39,7 +39,11 @@ public final class DetailGui extends Gui {
     public void render() {
         fillAll();
         Company c = plugin.market().get(ticker);
-        set(0, Items.of(Material.ARROW, "<yellow>◀ Kembali"), click -> new MarketGui(plugin, player).open());
+        set(0, Items.of(Material.ARROW, "<yellow>◀ Kembali"), click -> {
+            Company cc = plugin.market().get(ticker);
+            if (cc == null) new SectorGui(plugin, player).open();
+            else new MarketGui(plugin, player, plugin.market().sectorOf(cc)).open();
+        });
         if (c == null) return;
 
         set(4, infoItem(c), null);
@@ -130,7 +134,7 @@ public final class DetailGui extends Gui {
         }
         if (!c.system) lore.add("<gray>Kas perusahaan: <white>" + Text.money(c.treasury));
         if (!c.sector.isEmpty()) {
-            lore.add("<gray>Sektor: <white>" + Text.esc(plugin.market().sectors().getOrDefault(c.sector, c.sector)));
+            lore.add("<gray>Sektor: <white>" + Text.esc(plugin.market().sectorName(plugin.market().sectorOf(c))));
         }
         lore.add("<gray>Pemilik: <white>" + (c.owner == null ? "Bursa (sistem)" : Text.esc(Text.playerName(c.owner))));
         if (!c.description.isEmpty()) {
