@@ -13,14 +13,21 @@ import java.util.List;
 
 public final class MarketGui extends Gui {
     private int page = 0;
+    private final String sector; // null = semua sektor
 
     public MarketGui(StockExchangePlugin plugin, Player player) {
+        this(plugin, player, null);
+    }
+
+    public MarketGui(StockExchangePlugin plugin, Player player, String sector) {
         super(plugin, player);
+        this.sector = sector;
     }
 
     @Override
     protected Component title() {
-        return Text.mm("<dark_gray>Bursa Saham");
+        if (sector == null) return Text.mm("<dark_gray>Bursa Saham - Semua");
+        return Text.mm("<dark_gray>Bursa - " + Text.esc(plugin.market().sectorName(sector)));
     }
 
     @Override
@@ -32,7 +39,10 @@ public final class MarketGui extends Gui {
     public void render() {
         for (int i = 45; i < 54; i++) inv.setItem(i, Items.filler());
 
-        List<Company> list = plugin.market().tradable();
+        List<Company> list = new ArrayList<>();
+        for (Company c : plugin.market().tradable()) {
+            if (sector == null || sector.equals(plugin.market().sectorOf(c))) list.add(c);
+        }
         int pages = Math.max(1, (int) Math.ceil(list.size() / 45.0));
         if (page >= pages) page = pages - 1;
 
@@ -57,6 +67,8 @@ public final class MarketGui extends Gui {
             });
         }
 
+        set(46, Items.of(Material.COMPASS, "<yellow>Pilih Sektor", "<gray>Kembali ke daftar sektor"),
+                click -> new SectorGui(plugin, player).open());
         set(47, Items.of(Material.CHEST, "<aqua>Portofolio", "<gray>Lihat saham yang kamu miliki"),
                 click -> new PortfolioGui(plugin, player).open());
         set(48, Items.of(Material.GOLD_BLOCK, "<gold>Top Investor", "<gray>Portofolio terkaya"),
@@ -81,6 +93,7 @@ public final class MarketGui extends Gui {
             lore.add("<gray>24 jam: " + Text.pct(c.changePercent()));
             lore.add("<gray>Tersedia: <white>" + c.poolShares + "<gray>/" + c.totalShares);
         }
+        lore.add("<gray>Sektor: <white>" + Text.esc(plugin.market().sectorName(plugin.market().sectorOf(c))));
         lore.add("<gray>Pemilik: <white>" + (c.owner == null ? "Bursa (sistem)" : Text.esc(Text.playerName(c.owner))));
         lore.add("");
         lore.add("<yellow>Klik untuk membuka");
