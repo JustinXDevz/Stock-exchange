@@ -5,6 +5,7 @@ import dev.bursa.stockexchange.data.Database;
 import dev.bursa.stockexchange.gui.MarketGui;
 import dev.bursa.stockexchange.gui.NewsGui;
 import dev.bursa.stockexchange.gui.PortfolioGui;
+import dev.bursa.stockexchange.gui.SectorGui;
 import dev.bursa.stockexchange.gui.TopGui;
 import dev.bursa.stockexchange.market.Market;
 import dev.bursa.stockexchange.model.Company;
@@ -22,7 +23,7 @@ import java.util.List;
 import java.util.Locale;
 
 public final class StockCommand implements TabExecutor {
-    private static final List<String> SUBS = List.of("buy", "sell", "price", "portfolio", "top", "news", "history", "help");
+    private static final List<String> SUBS = List.of("buy", "sell", "price", "portfolio", "top", "news", "history", "all", "web", "help");
     private final StockExchangePlugin plugin;
 
     public StockCommand(StockExchangePlugin plugin) {
@@ -37,7 +38,7 @@ public final class StockCommand implements TabExecutor {
         }
         Market m = plugin.market();
         if (args.length == 0) {
-            new MarketGui(plugin, p).open();
+            new SectorGui(plugin, p).open();
             return true;
         }
 
@@ -79,6 +80,18 @@ public final class StockCommand implements TabExecutor {
                             + Text.duration(c.ipoEnd - System.currentTimeMillis()));
                 }
             }
+            case "all" -> new MarketGui(plugin, p).open();
+            case "web" -> {
+                String url = plugin.getConfig().getString("web.public-url", "");
+                if (!plugin.getConfig().getBoolean("web.enabled", true)) {
+                    plugin.msg(p, "<red>Website bursa tidak aktif di server ini.");
+                } else if (url == null || url.isBlank()) {
+                    plugin.msg(p, "<yellow>Website bursa aktif di port <white>" + plugin.getConfig().getInt("web.port", 8123)
+                            + "<yellow>. Tanyakan admin alamat lengkapnya.");
+                } else {
+                    plugin.msg(p, "<yellow>Pantau harga saham realtime: <aqua>" + Text.esc(url));
+                }
+            }
             case "portfolio" -> new PortfolioGui(plugin, p).open();
             case "top" -> new TopGui(plugin, p).open();
             case "news" -> new NewsGui(plugin, p).open();
@@ -89,7 +102,8 @@ public final class StockCommand implements TabExecutor {
             }
             default -> {
                 plugin.msg(p, "<yellow>Perintah /stock:");
-                plugin.msg(p, "<gray>/stock <white>- buka bursa (GUI)");
+                plugin.msg(p, "<gray>/stock <white>- buka bursa (GUI per sektor)");
+                plugin.msg(p, "<gray>/stock all | web");
                 plugin.msg(p, "<gray>/stock buy|sell [ticker] [jumlah]");
                 plugin.msg(p, "<gray>/stock price [ticker]");
                 plugin.msg(p, "<gray>/stock portfolio | top | news | history");
