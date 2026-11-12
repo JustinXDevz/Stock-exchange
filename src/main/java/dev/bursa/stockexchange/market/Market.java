@@ -49,7 +49,10 @@ public final class Market {
     private final Deque<String> news = new ArrayDeque<>();
     private final Random random = new Random();
     private final SimpleDateFormat timeFmt = new SimpleDateFormat("dd/MM HH:mm");
-    private final Map<String, Double> pressure = new HashMap<>();
+    private final Map<String, Double> pressure = new HashMap<>();          // per id sektor
+    private final Map<String, String> tokenIndex = new HashMap<>();         // token item -> id sektor
+    private final Map<String, String> sectorNames = new LinkedHashMap<>();
+    private final Map<String, String> sectorIcons = new HashMap<>();
     private final Map<UUID, Double> contributed = new HashMap<>();
     private boolean frozen;
     private int tickCounter;
@@ -61,6 +64,7 @@ public final class Market {
 
     public void load() throws SQLException {
         for (Company c : db.loadAll()) companies.put(c.ticker, c);
+        reloadSectors();
     }
 
     // ---------- Config helper ----------
@@ -543,15 +547,18 @@ public final class Market {
 
     // ---------- Admin ----------
 
-    public Result createSystemStock(String ticker, String name, double price, double volatility, int totalShares) {
+    public Result createSystemStock(String ticker, String name, double price, double volatility, int totalShares, String sector) {
         ticker = ticker.toUpperCase(Locale.ROOT);
         if (!ticker.matches("[A-Z0-9]{2,6}")) return fail("Ticker harus 2-6 karakter huruf/angka.");
         if (companies.containsKey(ticker)) return fail("Ticker sudah dipakai.");
         if (price < d("market.min-price")) return fail("Harga terlalu kecil.");
+        String sec = sector.equalsIgnoreCase("none") ? "" : normalizeSector(sector);
+        if (sec == null) return fail("Sektor tidak dikenal. Daftar: " + String.join(", ", sectorNames.keySet()));
         long now = System.currentTimeMillis();
         Company c = new Company(ticker, name);
         c.system = true;
         c.owner = null;
+        c.sector = sec;
         c.totalShares = totalShares;
         c.poolShares = totalShares;
         c.price = price;
@@ -639,12 +646,81 @@ public final class Market {
 
     // ---------- Integrasi shop (EconomyShopGUI) ----------
 
-    /** id sektor -> nama tampilan, dari config. */
-    public Map<String, String> sectors() {
-        Map<String, String> out = new LinkedHashMap<>();
-        ConfigurationSection secs = cfg().getConfigurationSection("shop.sectors");
+    /** Baca ulang daftar sektor + indeks token dari config. */
+    public void reloadSectors() {
+        tokenIndex.clear();
+        sectorNames.clear();
+        sectorIcons.clear();
+        ConfigurationSection secs = cfg().getConfigurationSection("sectors");
         if (secs != null) {
-            for (String id : secs.getKeys(false)) out.put(id, secs.getString(id + ".name", id));
+            for (String id : secs.getKeys(false)) {
+                sectorNames.put(id, secs.getString(id + ".name", id));
+                sectorIcons.put(id, secs.getString(id + ".icon", "PAPER"));
+                if (id.equalsIgnoreCase("other")) continue;
+                tokenIndex.putIfAbsent(id.toUpperCase(Locale.ROOT), id);
+                for (String m : secs.getStringList(id + ".match")) {
+                    tokenIndex.putIfAbsent(m.toUpperCase(Locale.ROOT), id);
+                }
+            }
+        }
+        sectorNames.putIfAbsent("other", "Lainnya");
+        sectorIcons.putIfAbsent("other", "PAPER");
+    }
+
+    /** id sektor -> nama tampilan. */
+    public Map<String, String> sectors() {
+        return Collections.unmodifiableMap(sectorNames);
+    }
+
+    public String sectorName(String id) {
+        return sectorNames.getOrDefault(id, id);
+    }
+
+    /** Sektor efektif sebuah saham (kosong/tidak valid = "other"). */
+    public String sectorOf(Company c) {
+        String s = c.sector;
+        if (s == null || s.isEmpty()) return "other";
+        for (String k : sectorNames.keySet()) {
+            if (k.equalsIgnoreCase(s)) return k;
+        }
+        return "other";
+    }
+
+    private String normalizeSector(String id) {
+        for (String k : sectorNames.keySet()) {
+            if (k.equalsIgnoreCase(id)) return k;
+        }
+        return null;
+    }
+
+    public record SectorStat(String id, String name, String icon, int count, int ipo,
+                             double avgChange, Company best, Company worst) {}
+
+    public List<SectorStat> sectorStats() {
+        List<SectorStat> out = new ArrayList<>();
+        for (String id : sectorNames.keySet()) {
+            int count = 0;
+            int ipo = 0;
+            int n = 0;
+            double sum = 0;
+            Company best = null;
+            Company worst = null;
+            for (Company c : companies.values()) {
+                if (c.status != Status.LISTED && c.status != Status.IPO) continue;
+                if (!sectorOf(c).equals(id)) continue;
+                count++;
+                if (c.status == Status.IPO) {
+                    ipo++;
+                    continue;
+                }
+                double ch = c.changePercent();
+                sum += ch;
+                n++;
+                if (best == null || ch > best.changePercent()) best = c;
+                if (worst == null || ch < worst.changePercent()) worst = c;
+            }
+            out.add(new SectorStat(id, sectorNames.get(id), sectorIcons.getOrDefault(id, "PAPER"),
+                    count, ipo, n == 0 ? 0 : sum / n, best, worst));
         }
         return out;
     }
@@ -656,17 +732,26 @@ public final class Market {
         if (id.equalsIgnoreCase("none")) {
             c.sector = "";
             db.saveCompany(c);
-            return ok("Sektor " + c.ticker + " dilepas.");
+            return ok("Sektor " + c.ticker + " dilepas (masuk Lainnya).");
         }
-        for (String key : sectors().keySet()) {
-            if (key.equalsIgnoreCase(id)) {
-                c.sector = key;
-                db.saveCompany(c);
-                return ok(c.ticker + " kini di sektor " + sectors().get(key)
-                        + ". Sebagian omzet shop sektor ini masuk ke kas (jika sudah LISTED).");
-            }
+        String key = normalizeSector(id);
+        if (key == null) return fail("Sektor tidak dikenal. Lihat daftar: /company sector");
+        c.sector = key;
+        db.saveCompany(c);
+        return ok(c.ticker + " kini di sektor " + sectorName(key)
+                + ". Sebagian omzet shop sektor ini masuk ke kas (jika sudah LISTED).");
+    }
+
+    public Result setSectorAdmin(Company c, String id) {
+        if (id.equalsIgnoreCase("none")) {
+            c.sector = "";
+        } else {
+            String key = normalizeSector(id);
+            if (key == null) return fail("Sektor tidak dikenal.");
+            c.sector = key;
         }
-        return fail("Sektor tidak dikenal. Lihat daftar: /company sector");
+        db.saveCompany(c);
+        return ok("Sektor " + c.ticker + " = " + sectorName(sectorOf(c)) + ".");
     }
 
     /**
@@ -676,31 +761,24 @@ public final class Market {
      */
     public String recordShopTransaction(UUID player, Boolean buy, double value, Set<String> tokens) {
         if (frozen || value <= 0) return null;
-        ConfigurationSection secs = cfg().getConfigurationSection("shop.sectors");
-        if (secs == null) return null;
-
         String sectorId = null;
-        for (String id : secs.getKeys(false)) {
-            for (String match : secs.getStringList(id + ".match")) {
-                if (tokens.contains(match.toUpperCase(Locale.ROOT))) {
-                    sectorId = id;
-                    break;
-                }
+        for (String t : tokens) {
+            String sec = tokenIndex.get(t);
+            if (sec != null) {
+                sectorId = sec;
+                break;
             }
-            if (sectorId != null) break;
         }
         if (sectorId == null) return null;
 
-        // 1) Tekanan supply/demand ke saham sektor
-        String stockTicker = secs.getString(sectorId + ".stock", "");
-        Company stock = (stockTicker == null || stockTicker.isEmpty()) ? null : get(stockTicker);
-        if (buy != null && stock != null && stock.status == Status.LISTED) {
+        // 1) Tekanan supply/demand ke saham di sektor ini
+        if (buy != null) {
             double cap = d("shop.max-per-player-per-tick");
             double used = contributed.getOrDefault(player, 0.0);
             double eff = Math.max(0, Math.min(value, cap - used));
             contributed.put(player, used + eff);
             double dir = buy ? d("shop.buy-direction") : d("shop.sell-direction");
-            pressure.merge(stock.ticker, dir * eff / Math.max(1.0, d("shop.volume-reference")), Double::sum);
+            pressure.merge(sectorId, dir * eff / Math.max(1.0, d("shop.volume-reference")), Double::sum);
         }
 
         // 2) Omzet ke kas perusahaan pemain di sektor ini
@@ -708,7 +786,7 @@ public final class Market {
         if (pool > 0) {
             List<Company> linked = new ArrayList<>();
             for (Company c : companies.values()) {
-                if (!c.system && c.status == Status.LISTED && sectorId.equalsIgnoreCase(c.sector)) linked.add(c);
+                if (!c.system && c.status == Status.LISTED && sectorId.equals(sectorOf(c))) linked.add(c);
             }
             if (!linked.isEmpty()) {
                 double per = pool / linked.size();
@@ -752,6 +830,7 @@ public final class Market {
         double delistPrice = d("market.delist-price");
         int delistTicks = i("market.delist-ticks");
         int histEvery = Math.max(1, i("market.history-interval-ticks"));
+        boolean affectCompanies = cfg().getBoolean("shop.pressure-affects-company-stocks", false);
 
         List<Company> bankrupt = new ArrayList<>();
         for (Company c : companies.values()) {
@@ -763,7 +842,7 @@ public final class Market {
                 c.driftTicks--;
                 if (c.driftTicks == 0) c.drift = 0;
             }
-            Double pr = pressure.remove(c.ticker);
+            Double pr = (c.system || affectCompanies) ? pressure.get(sectorOf(c)) : null;
             if (pr != null) {
                 double maxC = d("shop.max-change-per-tick");
                 change += Math.max(-maxC, Math.min(maxC, pr * d("shop.sensitivity")));
