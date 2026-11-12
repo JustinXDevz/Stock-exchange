@@ -42,6 +42,6 @@ public final class MyCompaniesGui extends Gui {
             set(13, Items.of(Material.BARRIER, "<gray>Kamu belum punya perusahaan",
                     "<gray>Buat dengan: <white>/company create [ticker] [saham] [nama]"), null);
         }
-        set(22, Items.of(Material.ARROW, "<yellow>◀ Kembali"), click -> new MarketGui(plugin, player).open());
+        set(22, Items.of(Material.ARROW, "<yellow>◀ Kembali"), click -> new SectorGui(plugin, player).open());
     }
 }
