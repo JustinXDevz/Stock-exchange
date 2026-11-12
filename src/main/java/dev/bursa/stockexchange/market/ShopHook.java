@@ -169,9 +169,9 @@ public final class ShopHook {
     private void collect(Object o, Set<String> tokens, int depth) {
         if (o == null || depth > 3 || tokens.size() > 200) return;
         if (o instanceof ItemStack is) {
-            addTokens(tokens, is.getType().name());
+            tokens.add(is.getType().name());
         } else if (o instanceof Material mat) {
-            addTokens(tokens, mat.name());
+            tokens.add(mat.name());
         } else if (o instanceof String s) {
             if (depth > 0 && s.length() < 80) addTokens(tokens, s);
         } else if (o instanceof Collection<?> c) {
@@ -203,8 +203,8 @@ public final class ShopHook {
             try {
                 Object v = m.invoke(item);
                 if (v instanceof String s) addTokens(tokens, s);
-                else if (v instanceof ItemStack is) addTokens(tokens, is.getType().name());
-                else if (v instanceof Material mat) addTokens(tokens, mat.name());
+                else if (v instanceof ItemStack is) tokens.add(is.getType().name());
+                else if (v instanceof Material mat) tokens.add(mat.name());
             } catch (Throwable ignored) {
                 // abaikan method yang gagal
             }
