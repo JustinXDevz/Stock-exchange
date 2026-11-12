@@ -47,6 +47,6 @@ public final class TopGui extends Gui {
         if (top.isEmpty()) {
             set(13, Items.of(Material.BARRIER, "<gray>Belum ada investor"), null);
         }
-        set(22, Items.of(Material.ARROW, "<yellow>◀ Kembali"), click -> new MarketGui(plugin, player).open());
+        set(22, Items.of(Material.ARROW, "<yellow>◀ Kembali"), click -> new SectorGui(plugin, player).open());
     }
 }
