@@ -9,6 +9,8 @@ import dev.bursa.stockexchange.gui.Prompts;
 import dev.bursa.stockexchange.market.Market;
 import dev.bursa.stockexchange.market.ShopHook;
 import dev.bursa.stockexchange.util.Text;
+import dev.bursa.stockexchange.web.Snapshot;
+import dev.bursa.stockexchange.web.WebServer;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.PluginCommand;
@@ -24,6 +26,7 @@ public final class StockExchangePlugin extends JavaPlugin {
     private Prompts prompts;
     private Economy economy;
     private ShopHook shopHook;
+    private WebServer webServer;
 
     @Override
     public void onEnable() {
@@ -55,6 +58,18 @@ public final class StockExchangePlugin extends JavaPlugin {
         long eventTicks = 20L * 60L * Math.max(1, getConfig().getInt("events.interval-minutes", 30));
         getServer().getScheduler().runTaskTimer(this, market::randomEvent, eventTicks, eventTicks);
 
+        if (getConfig().getBoolean("web.enabled", true)) {
+            Snapshot snapshot = new Snapshot(this);
+            snapshot.refresh();
+            webServer = new WebServer(this, snapshot);
+            if (webServer.start()) {
+                long webTicks = 20L * Math.max(1, getConfig().getInt("web.refresh-seconds", 5));
+                getServer().getScheduler().runTaskTimer(this, snapshot::refresh, webTicks, webTicks);
+            } else {
+                webServer = null;
+            }
+        }
+
         shopHook = new ShopHook(this);
         getServer().getScheduler().runTask(this, shopHook::hook);
 
@@ -68,6 +83,7 @@ public final class StockExchangePlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (webServer != null) webServer.stop();
         if (database != null) database.close();
     }
 
@@ -97,4 +113,4 @@ public final class StockExchangePlugin extends JavaPlugin {
     public void msg(CommandSender to, String mm) {
         to.sendMessage(Text.mm(Text.PREFIX + mm));
     }
-        }
+}
