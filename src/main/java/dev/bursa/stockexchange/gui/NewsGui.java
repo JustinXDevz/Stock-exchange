@@ -33,6 +33,6 @@ public final class NewsGui extends Gui {
         if (news.isEmpty()) {
             set(13, Items.of(Material.BARRIER, "<gray>Belum ada berita"), null);
         }
-        set(22, Items.of(Material.ARROW, "<yellow>◀ Kembali"), click -> new MarketGui(plugin, player).open());
+        set(22, Items.of(Material.ARROW, "<yellow>◀ Kembali"), click -> new SectorGui(plugin, player).open());
     }
 }
