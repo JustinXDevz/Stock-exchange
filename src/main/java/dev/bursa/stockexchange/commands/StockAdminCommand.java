@@ -15,7 +15,7 @@ import java.util.Locale;
 
 public final class StockAdminCommand implements TabExecutor {
     private static final List<String> SUBS = List.of("create", "delete", "setprice", "setvol", "seticon",
-            "event", "freeze", "unfreeze", "reload", "list", "shop", "shopdebug");
+            "event", "freeze", "unfreeze", "reload", "list", "shop", "shopdebug", "setsector", "sectors");
     private final StockExchangePlugin plugin;
 
     public StockAdminCommand(StockExchangePlugin plugin) {
@@ -31,8 +31,9 @@ public final class StockAdminCommand implements TabExecutor {
         Market m = plugin.market();
         switch (args[0].toLowerCase(Locale.ROOT)) {
             case "create" -> {
-                if (args.length < 4) {
-                    plugin.msg(s, "<red>Gunakan: /stockadmin create [ticker] [harga] [nama...]");
+                if (args.length < 5) {
+                    plugin.msg(s, "<red>Gunakan: /stockadmin create [ticker] [harga] [sektor|none] [nama...]");
+                    plugin.msg(s, "<gray>Sektor: " + String.join(", ", m.sectors().keySet()));
                     return true;
                 }
                 Double price = Text.parseMoney(args[2]);
@@ -40,14 +41,14 @@ public final class StockAdminCommand implements TabExecutor {
                     plugin.msg(s, "<red>Harga tidak valid.");
                     return true;
                 }
-                String name = String.join(" ", Arrays.copyOfRange(args, 3, args.length));
+                String name = String.join(" ", Arrays.copyOfRange(args, 4, args.length));
                 if (!name.matches("[\\p{L}\\p{N} .'&-]{2,24}")) {
                     plugin.msg(s, "<red>Nama harus 2-24 karakter (huruf, angka, spasi, . ' & -).");
                     return true;
                 }
                 int shares = plugin.getConfig().getInt("admin.default-total-shares", 10000);
                 double vol = plugin.getConfig().getDouble("market.default-volatility", 0.01);
-                reply(s, m.createSystemStock(args[1], name, price, vol, shares));
+                reply(s, m.createSystemStock(args[1], name, price, vol, shares, args[3]));
             }
             case "delete" -> {
                 if (args.length < 2) {
@@ -98,8 +99,23 @@ public final class StockAdminCommand implements TabExecutor {
             }
             case "reload" -> {
                 plugin.reloadConfig();
+                m.reloadSectors();
                 Text.currency = plugin.getConfig().getString("currency-symbol", "$");
                 plugin.msg(s, "<green>Config dimuat ulang (interval timer butuh restart).");
+            }
+            case "setsector" -> {
+                Company c = args.length < 3 ? null : m.get(args[1]);
+                if (c == null) {
+                    plugin.msg(s, "<red>Gunakan: /stockadmin setsector [ticker] [sektor|none]");
+                    return true;
+                }
+                reply(s, m.setSectorAdmin(c, args[2]));
+            }
+            case "sectors" -> {
+                for (Market.SectorStat st : m.sectorStats()) {
+                    plugin.msg(s, "<white>" + Text.esc(st.id()) + " <gray>(" + Text.esc(st.name()) + ") saham: <white>" + st.count()
+                            + " <gray>rata-rata 24j: " + Text.pct(st.avgChange()));
+                }
             }
             case "shop" -> plugin.msg(s, "<gray>" + Text.esc(plugin.shopHook().status()));
             case "shopdebug" -> plugin.msg(s, plugin.shopHook().toggleDebug()
@@ -125,10 +141,16 @@ public final class StockAdminCommand implements TabExecutor {
         List<String> out = new ArrayList<>();
         if (args.length == 1) {
             for (String s : SUBS) if (s.startsWith(args[0].toLowerCase(Locale.ROOT))) out.add(s);
-        } else if (args.length == 2 && List.of("delete", "setprice", "setvol", "seticon").contains(args[0].toLowerCase(Locale.ROOT))) {
+        } else if (args.length == 2 && List.of("delete", "setprice", "setvol", "seticon", "setsector").contains(args[0].toLowerCase(Locale.ROOT))) {
             for (Company c : plugin.market().all()) {
                 if (c.ticker.toLowerCase(Locale.ROOT).startsWith(args[1].toLowerCase(Locale.ROOT))) out.add(c.ticker);
             }
+        } else if (args.length == 3 && args[0].equalsIgnoreCase("setsector")) {
+            out.add("none");
+            out.addAll(plugin.market().sectors().keySet());
+        } else if (args.length == 4 && args[0].equalsIgnoreCase("create")) {
+            out.add("none");
+            out.addAll(plugin.market().sectors().keySet());
         } else if (args.length == 2 && args[0].equalsIgnoreCase("event")) {
             out.addAll(List.of("boom", "crash"));
         } else if (args.length == 3 && args[0].equalsIgnoreCase("event")) {
