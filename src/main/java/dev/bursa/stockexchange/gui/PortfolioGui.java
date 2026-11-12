@@ -81,7 +81,7 @@ public final class PortfolioGui extends Gui {
             shown++;
         }
 
-        set(45, Items.of(Material.ARROW, "<yellow>◀ Kembali"), click -> new MarketGui(plugin, player).open());
+        set(45, Items.of(Material.ARROW, "<yellow>◀ Kembali"), click -> new SectorGui(plugin, player).open());
         List<String> sum = new ArrayList<>();
         sum.add("<gray>Total nilai: <white>" + Text.money(totalValue));
         if (totalCost > 0) {
